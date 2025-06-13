@@ -71,11 +71,11 @@ export const BookForm = ({ book, onSubmit, onClose, isLoading }) => {
       )}
     </div>
   );
-  
+
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border border-gray-200">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-auto ">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border border-gray-200 md:mt-0 mt-60">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 ">
           <h2 className="text-2xl font-semibold text-gray-900">
             {book ? "Edit Book" : "Add New Book"}
           </h2>
@@ -87,7 +87,7 @@ export const BookForm = ({ book, onSubmit, onClose, isLoading }) => {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="px-6 py-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="px-6 py-6 ">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <InputField id="title" label="Title" required />
             <InputField id="author" label="Author" required />

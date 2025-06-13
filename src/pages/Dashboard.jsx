@@ -29,10 +29,9 @@ const Dashboard = () => {
       return books
         .filter((book) =>
           filters.search
-            ? [
-                book.title.toLowerCase(),
-                book.author.toLowerCase(),
-              ].some((field) => field.includes(filters.search.toLowerCase()))
+            ? [book.title.toLowerCase(), book.author.toLowerCase()].some(
+                (field) => field.includes(filters.search.toLowerCase())
+              )
             : true
         )
         .filter((book) => (filters.genre ? book.genre === filters.genre : true))
