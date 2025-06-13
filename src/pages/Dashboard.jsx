@@ -1,105 +1,78 @@
-import React, { useMemo, useState, useCallback, useEffect } from "react";
+import React, { useMemo, useState, useCallback } from "react";
+import useSWR from "swr";
+import { bookService } from "../services/bookService";
 import { Header } from "../components/Layout/Header";
 import { BookFilters } from "../components/Books/BookFilters";
 import { BookList } from "../components/Books/BookList";
 import { BookForm } from "../components/Books/BookForm";
 import { DeleteConfirmModal } from "../components/Books/DeleteConfirmModal";
 import { Pagination } from "../components/Books/Pagination";
-import axios from "axios";
+import toast from "react-hot-toast";
 
 const Dashboard = () => {
-  const [allBooks, setAllBooks] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [filters, setFilters] = useState({ search: "", genre: "", status: "" });
   const [showForm, setShowForm] = useState(false);
   const [editingBook, setEditingBook] = useState(null);
   const [deletingBookId, setDeletingBookId] = useState(null);
   const [deletingBookTitle, setDeletingBookTitle] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
   const itemsPerPage = 9;
 
-  const fetchBooks = useCallback(async () => {
-    setIsLoading(true);
-    const { data } = await axios.get("/books.json");
-    // Simulate loading delay
-    setTimeout(() => {
-      setAllBooks(data);
-      setIsLoading(false);
-    }, 500); //seconds delay
-  }, []);
+  const {
+    data: allBooks = [],
+    isLoading,
+    mutate,
+  } = useSWR("books", bookService.getBooks);
 
   const applyFilters = useCallback(
     (books) => {
-      let filteredBooks = [...books];
-      if (filters.search) {
-        filteredBooks = filteredBooks.filter((book) =>
-          book.title.toLowerCase().includes(filters.search.toLowerCase())
+      return books
+        .filter((book) =>
+          filters.search
+            ? book.title.toLowerCase().includes(filters.search.toLowerCase())
+            : true
+        )
+        .filter((book) => (filters.genre ? book.genre === filters.genre : true))
+        .filter((book) =>
+          filters.status ? book.status === filters.status : true
         );
-      }
-      if (filters.genre) {
-        filteredBooks = filteredBooks.filter(
-          (book) => book.genre === filters.genre
-        );
-      }
-      if (filters.status) {
-        filteredBooks = filteredBooks.filter(
-          (book) => book.status === filters.status
-        );
-      }
-      return filteredBooks;
     },
     [filters]
   );
 
-  const handleFiltersChange = useCallback((newFilters) => {
+  const handleFiltersChange = (newFilters) => {
     setFilters(newFilters);
     setCurrentPage(1);
-  }, []);
-
-  const handlePageChange = useCallback((page) => {
-    setCurrentPage(page);
-  }, []);
+  };
 
   const paginatedBooks = useMemo(() => {
-    const filteredBooks = applyFilters(allBooks);
-    return filteredBooks.slice(
+    const filtered = applyFilters(allBooks);
+    return filtered.slice(
       (currentPage - 1) * itemsPerPage,
       currentPage * itemsPerPage
     );
   }, [allBooks, applyFilters, currentPage]);
 
-  const totalBooks = useMemo(
-    () => applyFilters(allBooks).length,
-    [allBooks, applyFilters]
-  );
-  const totalPages = useMemo(
-    () => Math.ceil(totalBooks / itemsPerPage),
-    [totalBooks]
-  );
+  const totalBooks = applyFilters(allBooks).length;
+  const totalPages = Math.ceil(totalBooks / itemsPerPage);
 
   const genres = useMemo(
     () => [...new Set(allBooks.map((b) => b.genre))],
     [allBooks]
   );
 
-  useEffect(() => {
-    fetchBooks();
-  }, [fetchBooks]);
-
   return (
     <div className="min-h-screen bg-gray-50">
       <Header onAddBook={() => setShowForm(true)} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Book Management Dashboard
-          </h1>
-          <p className="text-gray-600">
-            Manage your library collection with ease. Add, edit, search, and
-            organize your books.
-          </p>
-        </div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          Book Management Dashboard
+        </h1>
+        <p className="text-gray-600 mb-6">
+          Manage your library collection with ease. Add, edit, search, and
+          organize your books.
+        </p>
 
         <BookFilters
           filters={filters}
@@ -108,14 +81,12 @@ const Dashboard = () => {
         />
 
         {!isLoading && totalBooks > 0 && (
-          <div className="mb-6">
-            <p className="text-sm text-gray-600">
-              Showing {paginatedBooks.length} of {totalBooks} books
-              {filters.search && ` matching "${filters.search}"`}
-              {filters.genre && ` in ${filters.genre}`}
-              {filters.status && ` with status "${filters.status}"`}
-            </p>
-          </div>
+          <p className="text-sm text-gray-600 mb-4">
+            Showing {paginatedBooks.length} of {totalBooks} books
+            {filters.search && ` matching "${filters.search}"`}
+            {filters.genre && ` in ${filters.genre}`}
+            {filters.status && ` with status "${filters.status}"`}
+          </p>
         )}
 
         <BookList
@@ -134,32 +105,33 @@ const Dashboard = () => {
           }}
         />
 
-        {!isLoading && totalPages > 1 && (
+        {totalPages > 1 && !isLoading && (
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}
-            onPageChange={handlePageChange}
+            onPageChange={setCurrentPage}
           />
         )}
 
         {showForm && (
           <BookForm
             book={editingBook}
-            onSubmit={(data) => {
-              if (editingBook) {
-                const updatedBooks = allBooks.map((b) =>
-                  b.id === editingBook.id ? { ...data, id: editingBook.id } : b
-                );
-                setAllBooks(updatedBooks);
-              } else {
-                const newBook = {
-                  ...data,
-                  id: Date.now().toString(),
-                };
-                setAllBooks([...allBooks, newBook]);
+            onSubmit={async (data) => {
+              try {
+                if (editingBook) {
+                  await bookService.updateBook(editingBook.id, data);
+                  toast.success("Book updated successfully!");
+                } else {
+                  await bookService.addBook(data);
+                  toast.success("Book added successfully!");
+                }
+                await mutate(); // Refresh list
+                setShowForm(false);
+                setEditingBook(null);
+              } catch (err) {
+                toast.error("Failed to save book");
+                console.error("Error saving book:", err);
               }
-              setShowForm(false);
-              setEditingBook(null);
             }}
             onClose={() => {
               setShowForm(false);
@@ -172,15 +144,18 @@ const Dashboard = () => {
         {deletingBookId && (
           <DeleteConfirmModal
             bookTitle={deletingBookTitle}
-            onConfirm={() => {
-              const updatedBooks = allBooks.filter(
-                (b) => b.id !== deletingBookId
-              );
-              setAllBooks(updatedBooks);
-              setDeletingBookId(null);
-              setDeletingBookTitle("");
-              if (totalBooks === 1 && currentPage > 1) {
-                setCurrentPage(currentPage - 1);
+            onConfirm={async () => {
+              try {
+                await bookService.deleteBook(deletingBookId);
+                toast.success("Book deleted!");
+                await mutate(); // Refresh list
+                setDeletingBookId(null);
+                setDeletingBookTitle("");
+                if (totalBooks === 1 && currentPage > 1)
+                  setCurrentPage(currentPage - 1);
+              } catch (err) {
+                toast.error("Failed to delete book");
+                console.error("Error deleting book:", err);
               }
             }}
             onCancel={() => {
